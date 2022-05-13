@@ -1,0 +1,183 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<style>
+    html, body {
+        height: 100%;
+    }
+
+    body {
+        display: flex;
+        background-color: #ECEFF1;
+    }
+    
+    .level-counter {
+        font-family: Courier, monospace;
+        letter-spacing: 2px;
+        font-size: 350%;
+        text-align: justify;
+        display: flex;
+        justify-content: center;
+        padding-bottom: 5%;
+    }
+
+    .container {
+        width: 90%;
+        margin: auto;
+    }
+
+    .radiation-level-chart {
+        display: flex;
+    }
+
+</style>
+
+<head>
+    <meta charset="UTF-8">
+    <title>γ-meter</title>
+</head>
+<body>
+
+<div class="container">
+    <script src="chart.js"></script>
+
+    <div id="current-radiation-level" class="level-counter"></div>
+
+    <div class="radiation-level-chart">
+        <canvas id="radiation-level-chart"></canvas>
+    </div>
+</div>
+
+<script>
+    const counter_data_name = "y_meter_data"
+    const counter_labels_name = "y_meter_labels"
+    const counter_colors_name = "y_meter_colors"
+
+    function fetchArray(name) {
+        if (localStorage.getItem(name) == null) {
+            localStorage.setItem(name, '[]')
+        }
+
+        console.log(JSON.parse(localStorage.getItem(name)))
+
+        return JSON.parse(localStorage.getItem(name))
+    }
+
+    function updateArray(name, value) {
+        localStorage.setItem(name, JSON.stringify(value))
+    }
+
+    let data = fetchArray(counter_data_name)
+    let labels = fetchArray(counter_labels_name)
+    let colors = fetchArray(counter_colors_name)
+
+    console.log(data)
+
+    var counter = 0
+
+    function getColor(value) {
+
+        if (value < 20) {
+            return "#66BB6A";
+        }
+        if (value > 50) {
+            return "#EF5350";
+        }
+
+        return "#FFA726";
+    }
+
+    function formatTimeUnit(unit) {
+        if (unit < 10) {
+            return "0" + unit
+        }
+
+        return unit
+    }
+
+    function updateColors() {
+        const colors = []
+        for (i = 0; i < data.length; i++) {
+            colors[i] = getColor(data[i]);
+        }
+
+        return colors
+    }
+
+    const chart = new Chart("radiation-level-chart", {
+        type: 'bar',
+        data: {
+            labels: labels,
+            datasets: [{
+                data: data,
+                backgroundColor: updateColors(),
+            }
+            ]
+        },
+        options: {
+            elements: {
+                point: {
+                    radius: 0
+                }
+            },
+            animation: false,
+            responsive: true,
+            legend: {
+                display: false
+            },
+            tooltips: {
+                enabled: true
+            },
+            scales: {
+                xAxes: [{
+                    display: true
+                }],
+                yAxes: [{
+                    display: true,
+                    ticks: {
+                        beginAtZero: true,
+                        steps: 10,
+                        stepValue: 0.1
+                    }
+                }]
+            }
+        }
+    });
+
+
+    setInterval(function () {
+        fetch('http://192.168.0.63:8080/statistic')
+            .then((response) => {
+                return response.json()
+            })
+            .then((data) => {
+                return data["staticIntensity"];
+            })
+            .then((value) => {
+                let today = new Date();
+                let date = formatTimeUnit(today.getHours()) + ":" + formatTimeUnit(today.getMinutes()) + ":" + formatTimeUnit(today.getSeconds())
+
+                if (labels.length > 1 * 60) {
+                    labels.shift()
+                    data.shift()
+                    colors.shift()
+                }
+
+                data.push(value)
+                labels.push(date)
+                colors.push(getColor(value))
+
+                updateArray(counter_data_name, data)
+                updateArray(counter_labels_name, labels)
+                updateArray(counter_colors_name, colors)
+
+                document.getElementById("current-radiation-level").textContent = value + " μR/HR"
+                chart.data.datasets[0].backgroundColor = colors
+                chart.update()
+            });
+    }, 1000);
+
+</script>
+
+</body>
+</html>
